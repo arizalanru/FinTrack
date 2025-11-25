@@ -1,0 +1,380 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fintrack/providers/auth_provider.dart' as MyAuth;
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Provider.of<MyAuth.AuthProvider>(context);
+
+    final userName = auth.userName.isEmpty ? "User" : auth.userName;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F2F2),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              /// ===== HEADER USER =====
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Color(0xFF0A2A5E),
+                    child: Icon(Icons.person, color: Colors.white, size: 30),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Halo, ${userName.split(' ').first}", 
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0A2A5E),
+                        ),
+                      ),
+                      const Text(
+                        "Ayo atur keuanganmu!",
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              /// ===== SALDO & DOMPET =====
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection("users")
+                    .doc(FirebaseAuth.instance.currentUser!.uid)
+                    .collection("transactions")
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return _loadingCard();
+
+                  final docs = snapshot.data!.docs;
+                  double income = 0;
+                  double expense = 0;
+                  Set<String> wallets = {}; // Use a Set to store unique wallet sources
+
+                  for (var d in docs) {
+                    final t = d.data() as Map<String, dynamic>;
+                    final nominal = (t["nominal"] as num).toDouble();
+                    if (t["type"] == "income") {
+                      income += nominal;
+                    } else {
+                      expense += nominal;
+                    }
+                    // Add wallet source to the set
+                    if (t['sumber'] != null) {
+                      wallets.add(t['sumber']);
+                    }
+                  }
+
+                  double saldo = income - expense;
+                  int walletCount = wallets.length;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A2A5E),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Pengeluaran Bulan Ini",
+                              style: const TextStyle(color: Colors.white, fontSize: 16),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              NumberFormat.currency(locale: 'id', symbol: "Rp ")
+                                  .format(expense)
+                                  .replaceAll(",00", ""),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      const Text(
+                        "Total Saldo & Dompet Kamu",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pushNamed(context, '/wallet');
+                              },
+                              child: _infoCard(
+                                icon: Icons.account_balance_wallet,
+                                title: "Total Saldo",
+                                value: NumberFormat.currency(
+                                        locale: 'id', symbol: "Rp ")
+                                    .format(saldo)
+                                    .replaceAll(",00", ""),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pushNamed(context, '/wallet');
+                              },
+                              child: _infoCard(
+                                icon: Icons.wallet,
+                                title: "Dompet Kamu",
+                                value: "$walletCount Dompet", // Dynamic wallet count
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              /// ===== KATEGORI PENGELUARAN =====
+
+              const SizedBox(height: 24),
+              const Text(
+                "Kategori Pengeluaran",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection("users")
+                    .doc(FirebaseAuth.instance.currentUser!.uid)
+                    .collection("transactions")
+                    .where('type', isEqualTo: 'expense')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return _noTransactionBox("Belum ada pengeluaran");
+                  }
+
+                  final docs = snapshot.data!.docs;
+                  Map<String, double> categoryTotals = {};
+
+                  for (var d in docs) {
+                    final t = d.data() as Map<String, dynamic>;
+                    final nominal = (t["nominal"] as num).toDouble();
+                    final kategori = t["kategori"];
+                    categoryTotals[kategori] = (categoryTotals[kategori] ?? 0) + nominal;
+                  }
+
+                  final data = categoryTotals.entries
+                      .map((e) => _CategoryChart(e.key, e.value))
+                      .toList();
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: SfCircularChart(
+                      legend: Legend(
+                        isVisible: true,
+                        position: LegendPosition.bottom,
+                        overflowMode: LegendItemOverflowMode.wrap,
+                      ),
+                      series: <DoughnutSeries<_CategoryChart, String>>[
+                        DoughnutSeries<_CategoryChart, String>(
+                          dataSource: data,
+                          xValueMapper: (d, _) => d.label,
+                          yValueMapper: (d, _) => d.value,
+                          innerRadius: '55%',
+                          radius: '75%',
+                          strokeWidth: 3, 
+                          strokeColor: Colors.white,
+                          dataLabelSettings: const DataLabelSettings(
+                            isVisible: true,
+                            labelPosition: ChartDataLabelPosition.outside,
+                          ),
+                          pointColorMapper: (d, index) {
+                            final colors = [
+                              const Color(0xFF062A61),
+                              const Color(0xFF2C4F87),
+                              const Color(0xFF567DB3),
+                              const Color(0xFF8EB5D3),
+                              const Color(0xFFC5DDF0),
+                            ];
+                            return colors[index % colors.length];
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+
+              const Text(
+                "Transaksi Terakhir",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+
+              StreamBuilder(
+                stream: FirebaseFirestore.instance
+                    .collection("users")
+                    .doc(FirebaseAuth.instance.currentUser!.uid)
+                    .collection("transactions")
+                    .orderBy("tanggal", descending: true)
+                    .limit(7)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return _noTransactionBox("Belum ada transaksi");
+                  }
+
+                  final docs = snapshot.data!.docs;
+                  if (docs.isEmpty) {
+                    return _noTransactionBox("Belum ada transaksi");
+                  }
+
+                  return Column(
+                    children: docs.map((doc) {
+                      final t = doc.data() as Map<String, dynamic>;
+                      return _transactionItem(t);
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _loadingCard() => Container(
+    padding: const EdgeInsets.all(20),
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: const Color(0xFF0A2A5E),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: const SizedBox(
+      height: 70,
+      child: Center(child: CircularProgressIndicator(color: Colors.white)),
+    ),
+  );
+
+  Widget _infoCard({required IconData icon, required String title, required String value}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF0A2A5E)),
+          const SizedBox(height: 6),
+          Text(title, style: const TextStyle(color: Colors.grey)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _transactionItem(Map<String, dynamic> t) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t["kategori"],
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(DateFormat('dd MMM yyyy').format((t["tanggal"] as Timestamp).toDate())),
+            ],
+          ),
+          Text(
+            NumberFormat.currency(
+              locale: 'id',
+              symbol: t["type"] == "income" ? "Rp " : "-Rp ",
+            ).format(t["nominal"]).replaceAll(",00", ""),
+            style: TextStyle(
+              color: t["type"] == "income" ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _noTransactionBox(String text) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Center(
+        child: Text(text, style: const TextStyle(color: Colors.grey)),
+      ),
+    );
+  }
+}
+
+class _CategoryChart {
+  final String label;
+  final double value;
+
+  _CategoryChart(this.label, this.value);
+}
