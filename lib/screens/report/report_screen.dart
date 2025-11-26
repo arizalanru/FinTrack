@@ -18,12 +18,16 @@ class _ReportScreenState extends State<ReportScreen> {
   DateTime get _startDate {
     final now = DateTime.now();
     switch (selectedPeriod) {
+      case "Hari Ini":
+        return DateTime(now.year, now.month, now.day);
       case "7 Hari Terakhir":
         return now.subtract(const Duration(days: 7));
       case "2 Minggu Terakhir":
         return now.subtract(const Duration(days: 14));
       case "1 Bulan Terakhir":
         return now.subtract(const Duration(days: 30));
+      case "1 Tahun Terakhir":
+        return now.subtract(const Duration(days: 365));
       default:
         return now.subtract(const Duration(days: 30));
     }
@@ -46,14 +50,14 @@ class _ReportScreenState extends State<ReportScreen> {
                 const Text("Pilih Periode",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
-                ...["7 Hari Terakhir", "2 Minggu Terakhir", "1 Bulan Terakhir"]
+                ...["Hari Ini", "7 Hari Terakhir", "2 Minggu Terakhir", "1 Bulan Terakhir", "1 Tahun Terakhir"]
                     .map((p) => RadioListTile(
                           value: p,
                           groupValue: selectedPeriod,
                           activeColor: const Color(0xFF0A2A5E),
                           onChanged: (val) {
                             setStateModal(() => selectedPeriod = val.toString());
-                            setState(() {}); // This updates the main screen
+                            setState(() {});
                           },
                           title: Text(p),
                         )),
@@ -81,28 +85,28 @@ class _ReportScreenState extends State<ReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Query query = FirebaseFirestore.instance
+        .collection("users")
+        .doc(FirebaseAuth.instance.currentUser!.uid)
+        .collection("transactions")
+        .where('tanggal', isGreaterThanOrEqualTo: _startDate)
+        .orderBy("tanggal", descending: true);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F2),
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection("users")
-                .doc(FirebaseAuth.instance.currentUser!.uid)
-                .collection("transactions")
-                .where('tanggal', isGreaterThanOrEqualTo: _startDate)
-                .orderBy("tanggal", descending: true)
-                .snapshots(),
+            stream: query.snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return _buildEmptyState(); // Show a proper empty state
+                return _buildEmptyState();
               }
 
               final docs = snapshot.data!.docs;
 
-              // Process data
               Map<String, double> expenseCategoryTotals = {};
               Map<String, double> incomeCategoryTotals = {};
               List<DocumentSnapshot> expenseTransactions = [];
@@ -116,26 +120,17 @@ class _ReportScreenState extends State<ReportScreen> {
 
                 if (type == 'expense') {
                   expenseTransactions.add(doc);
-                  expenseCategoryTotals[category] =
-                      (expenseCategoryTotals[category] ?? 0) + nominal;
+                  expenseCategoryTotals[category] = (expenseCategoryTotals[category] ?? 0) + nominal;
                 } else if (type == 'income') {
                   incomeTransactions.add(doc);
-                  incomeCategoryTotals[category] =
-                      (incomeCategoryTotals[category] ?? 0) + nominal;
+                  incomeCategoryTotals[category] = (incomeCategoryTotals[category] ?? 0) + nominal;
                 }
               }
 
-              final currentCategoryTotals =
-                  isExpense ? expenseCategoryTotals : incomeCategoryTotals;
-              final currentTransactions =
-                  isExpense ? expenseTransactions : incomeTransactions;
-
-              final chartData = currentCategoryTotals.entries
-                  .map((e) => _ChartData(e.key, e.value))
-                  .toList();
-
-              final total = currentCategoryTotals.values
-                  .fold(0.0, (sum, item) => sum + item);
+              final currentCategoryTotals = isExpense ? expenseCategoryTotals : incomeCategoryTotals;
+              final currentTransactions = isExpense ? expenseTransactions : incomeTransactions;
+              final chartData = currentCategoryTotals.entries.map((e) => _ChartData(e.key, e.value)).toList();
+              final total = currentCategoryTotals.values.fold(0.0, (sum, item) => sum + item);
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -155,7 +150,6 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // Helper method to build the header
   Widget _buildHeader() {
     return Column(
       children: [
@@ -185,7 +179,6 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
   
-  // Helper method for the empty state UI
   Widget _buildEmptyState() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -208,7 +201,6 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // Helper method to build the expense/income toggle
   Widget _buildTypeToggle() {
     return Container(
       height: 48,
@@ -255,7 +247,6 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // Helper method to build the chart card
   Widget _buildChartCard(double total, List<_ChartData> chartData) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -319,7 +310,6 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // Helper method to build the transaction list
   Widget _buildTransactionList(List<DocumentSnapshot> transactions) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,7 +367,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 Text(t["kategori"],
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text(
-                    DateFormat('dd MMM yyyy')
+                    DateFormat('dd MMM yyyy', 'id_ID')
                         .format((t["tanggal"] as Timestamp).toDate()),
                     style: const TextStyle(color: Colors.grey, fontSize: 13)),
               ],

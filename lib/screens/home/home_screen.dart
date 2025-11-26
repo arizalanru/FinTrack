@@ -12,7 +12,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<MyAuth.AuthProvider>(context);
-
+    final user = FirebaseAuth.instance.currentUser!;
     final userName = auth.userName.isEmpty ? "User" : auth.userName;
 
     return Scaffold(
@@ -55,119 +55,89 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              /// ===== SALDO & DOMPET =====
+              /// ===== SALDO & DOMPET (REFACTORED) =====
               StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection("users")
-                    .doc(FirebaseAuth.instance.currentUser!.uid)
-                    .collection("transactions")
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return _loadingCard();
+                stream: FirebaseFirestore.instance.collection('users').doc(user.uid).collection('wallets').snapshots(),
+                builder: (context, walletSnapshot) {
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('users').doc(user.uid).collection('transactions').snapshots(),
+                    builder: (context, transactionSnapshot) {
+                      
+                      if (walletSnapshot.connectionState == ConnectionState.waiting || transactionSnapshot.connectionState == ConnectionState.waiting) {
+                        return _loadingCard();
+                      }
 
-                  final docs = snapshot.data!.docs;
-                  double income = 0;
-                  double expense = 0;
-                  Set<String> wallets = {}; // Use a Set to store unique wallet sources
+                      // Calculate total initial balance from wallets
+                      double totalInitialBalance = 0;
+                      int walletCount = 0;
+                      if (walletSnapshot.hasData) {
+                        walletCount = walletSnapshot.data!.docs.length;
+                        for (var doc in walletSnapshot.data!.docs) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          totalInitialBalance += (data['balance'] as num).toDouble();
+                        }
+                      }
 
-                  for (var d in docs) {
-                    final t = d.data() as Map<String, dynamic>;
-                    final nominal = (t["nominal"] as num).toDouble();
-                    if (t["type"] == "income") {
-                      income += nominal;
-                    } else {
-                      expense += nominal;
-                    }
-                    // Add wallet source to the set
-                    if (t['sumber'] != null) {
-                      wallets.add(t['sumber']);
-                    }
-                  }
+                      // Calculate income and expense from transactions
+                      double income = 0;
+                      double expense = 0;
+                      if (transactionSnapshot.hasData) {
+                        for (var doc in transactionSnapshot.data!.docs) {
+                          final t = doc.data() as Map<String, dynamic>;
+                          if (t["type"] == "income") {
+                            income += (t["nominal"] as num).toDouble();
+                          } else {
+                            expense += (t["nominal"] as num).toDouble();
+                          }
+                        }
+                      }
 
-                  double saldo = income - expense;
-                  int walletCount = wallets.length;
+                      // Final, correct total saldo
+                      double totalSaldo = totalInitialBalance + income - expense;
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0A2A5E),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Pengeluaran Bulan Ini",
-                              style: const TextStyle(color: Colors.white, fontSize: 16),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              NumberFormat.currency(locale: 'id', symbol: "Rp ")
-                                  .format(expense)
-                                  .replaceAll(",00", ""),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      const Text(
-                        "Total Saldo & Dompet Kamu",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      Row(
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.pushNamed(context, '/wallet');
-                              },
-                              child: _infoCard(
-                                icon: Icons.account_balance_wallet,
-                                title: "Total Saldo",
-                                value: NumberFormat.currency(
-                                        locale: 'id', symbol: "Rp ")
-                                    .format(saldo)
-                                    .replaceAll(",00", ""),
-                              ),
-                            ),
+                          _buildExpenseCard(expense),
+                          const SizedBox(height: 20),
+                          const Text(
+                            "Total Saldo & Dompet Kamu",
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.pushNamed(context, '/wallet');
-                              },
-                              child: _infoCard(
-                                icon: Icons.wallet,
-                                title: "Dompet Kamu",
-                                value: "$walletCount Dompet", // Dynamic wallet count
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => Navigator.pushNamed(context, '/wallet'),
+                                  child: _infoCard(
+                                    icon: Icons.account_balance_wallet,
+                                    title: "Total Saldo",
+                                    value: NumberFormat.currency(locale: 'id', symbol: "Rp ")
+                                        .format(totalSaldo)
+                                        .replaceAll(",00", ""),
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => Navigator.pushNamed(context, '/wallet'),
+                                  child: _infoCard(
+                                    icon: Icons.wallet,
+                                    title: "Dompet Kamu",
+                                    value: "$walletCount Dompet",
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   );
                 },
               ),
-
-              const SizedBox(height: 24),
-
-              /// ===== KATEGORI PENGELUARAN =====
 
               const SizedBox(height: 24),
               const Text(
@@ -175,116 +145,145 @@ class HomeScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
-
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection("users")
-                    .doc(FirebaseAuth.instance.currentUser!.uid)
-                    .collection("transactions")
-                    .where('type', isEqualTo: 'expense')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return _noTransactionBox("Belum ada pengeluaran");
-                  }
-
-                  final docs = snapshot.data!.docs;
-                  Map<String, double> categoryTotals = {};
-
-                  for (var d in docs) {
-                    final t = d.data() as Map<String, dynamic>;
-                    final nominal = (t["nominal"] as num).toDouble();
-                    final kategori = t["kategori"];
-                    categoryTotals[kategori] = (categoryTotals[kategori] ?? 0) + nominal;
-                  }
-
-                  final data = categoryTotals.entries
-                      .map((e) => _CategoryChart(e.key, e.value))
-                      .toList();
-
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: SfCircularChart(
-                      legend: Legend(
-                        isVisible: true,
-                        position: LegendPosition.bottom,
-                        overflowMode: LegendItemOverflowMode.wrap,
-                      ),
-                      series: <DoughnutSeries<_CategoryChart, String>>[
-                        DoughnutSeries<_CategoryChart, String>(
-                          dataSource: data,
-                          xValueMapper: (d, _) => d.label,
-                          yValueMapper: (d, _) => d.value,
-                          innerRadius: '55%',
-                          radius: '75%',
-                          strokeWidth: 3, 
-                          strokeColor: Colors.white,
-                          dataLabelSettings: const DataLabelSettings(
-                            isVisible: true,
-                            labelPosition: ChartDataLabelPosition.outside,
-                          ),
-                          pointColorMapper: (d, index) {
-                            final colors = [
-                              const Color(0xFF062A61),
-                              const Color(0xFF2C4F87),
-                              const Color(0xFF567DB3),
-                              const Color(0xFF8EB5D3),
-                              const Color(0xFFC5DDF0),
-                            ];
-                            return colors[index % colors.length];
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-
+              _buildCategoryChart(user.uid),
+              const SizedBox(height: 24),
               const Text(
                 "Transaksi Terakhir",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-
-              StreamBuilder(
-                stream: FirebaseFirestore.instance
-                    .collection("users")
-                    .doc(FirebaseAuth.instance.currentUser!.uid)
-                    .collection("transactions")
-                    .orderBy("tanggal", descending: true)
-                    .limit(7)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return _noTransactionBox("Belum ada transaksi");
-                  }
-
-                  final docs = snapshot.data!.docs;
-                  if (docs.isEmpty) {
-                    return _noTransactionBox("Belum ada transaksi");
-                  }
-
-                  return Column(
-                    children: docs.map((doc) {
-                      final t = doc.data() as Map<String, dynamic>;
-                      return _transactionItem(t);
-                    }).toList(),
-                  );
-                },
-              ),
+              _buildRecentTransactions(user.uid),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildExpenseCard(double expense) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A2A5E),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Pengeluaran Bulan Ini",
+            style: TextStyle(color: Colors.white, fontSize: 16),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            NumberFormat.currency(locale: 'id', symbol: "Rp ")
+                .format(expense)
+                .replaceAll(",00", ""),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildCategoryChart(String uid) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("users")
+          .doc(uid)
+          .collection("transactions")
+          .where('type', isEqualTo: 'expense')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _noTransactionBox("Belum ada pengeluaran");
+        }
+
+        Map<String, double> categoryTotals = {};
+        for (var d in snapshot.data!.docs) {
+          final t = d.data() as Map<String, dynamic>;
+          final nominal = (t["nominal"] as num).toDouble();
+          final kategori = t["kategori"];
+          categoryTotals[kategori] = (categoryTotals[kategori] ?? 0) + nominal;
+        }
+
+        final data = categoryTotals.entries
+            .map((e) => _CategoryChart(e.key, e.value))
+            .toList();
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: SfCircularChart(
+            legend: Legend(
+              isVisible: true,
+              position: LegendPosition.bottom,
+              overflowMode: LegendItemOverflowMode.wrap,
+            ),
+            series: <DoughnutSeries<_CategoryChart, String>>[
+              DoughnutSeries<_CategoryChart, String>(
+                dataSource: data,
+                xValueMapper: (d, _) => d.label,
+                yValueMapper: (d, _) => d.value,
+                innerRadius: '55%',
+                radius: '75%',
+                strokeWidth: 3,                      
+                strokeColor: Colors.white,           
+                dataLabelSettings: const DataLabelSettings(
+                  isVisible: true,
+                  labelPosition: ChartDataLabelPosition.outside,
+                ),
+                pointColorMapper: (d, index) {
+                  final colors = [
+                    const Color(0xFF062A61),
+                    const Color(0xFF2C4F87),
+                    const Color(0xFF567DB3),
+                    const Color(0xFF8EB5D3),
+                    const Color(0xFFC5DDF0),
+                  ];
+                  return colors[index % colors.length];
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecentTransactions(String uid) {
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection("users")
+          .doc(uid)
+          .collection("transactions")
+          .orderBy("tanggal", descending: true)
+          .limit(7)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _noTransactionBox("Belum ada transaksi");
+        }
+
+        return Column(
+          children: snapshot.data!.docs.map((doc) {
+            final t = doc.data() as Map<String, dynamic>;
+            return _transactionItem(t);
+          }).toList(),
+        );
+      },
     );
   }
 
@@ -296,7 +295,7 @@ class HomeScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
     ),
     child: const SizedBox(
-      height: 70,
+      height: 150, // Adjusted height for the whole section
       child: Center(child: CircularProgressIndicator(color: Colors.white)),
     ),
   );
@@ -339,7 +338,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               Text(t["kategori"],
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text(DateFormat('dd MMM yyyy').format((t["tanggal"] as Timestamp).toDate())),
+              Text(DateFormat('dd MMM yyyy', 'id_ID').format((t["tanggal"] as Timestamp).toDate())),
             ],
           ),
           Text(

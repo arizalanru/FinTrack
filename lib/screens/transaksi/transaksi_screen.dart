@@ -40,6 +40,8 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         return now.subtract(const Duration(days: 7));
       case "1 bulan terakhir":
         return now.subtract(const Duration(days: 30));
+      case "1 tahun terakhir": // Added this option
+        return now.subtract(const Duration(days: 365));
       default: // "Semua tanggal"
         return null;
     }
@@ -68,6 +70,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                     _filterOption(setModalState, "Hari ini"),
                     _filterOption(setModalState, "1 minggu terakhir"),
                     _filterOption(setModalState, "1 bulan terakhir"),
+                    _filterOption(setModalState, "1 tahun terakhir"), // Added this option
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -102,21 +105,19 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
       title: Text(value),
       onChanged: (val) {
         setModalState(() => filter = val.toString());
-        setState(() {}); // Update the main screen to rebuild with the new filter
+        setState(() {});
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Base query
     Query query = FirebaseFirestore.instance
         .collection("users")
         .doc(FirebaseAuth.instance.currentUser!.uid)
         .collection("transactions")
         .orderBy("tanggal", descending: true);
 
-    // Apply date filter to the query
     if (_startDate != null) {
       query = query.where('tanggal', isGreaterThanOrEqualTo: _startDate);
     }
@@ -128,9 +129,8 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // We use a separate StreamBuilder for the summary cards that might have a different date range in the future.
               StreamBuilder<QuerySnapshot>(
-                stream: query.snapshots(), // Use the filtered query
+                stream: query.snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return _buildSummaryLoading();
@@ -160,7 +160,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
               const SizedBox(height: 16),
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream: query.snapshots(), // Use the same filtered query
+                  stream: query.snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -175,7 +175,6 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
 
                     var docs = snapshot.data!.docs;
 
-                    // Apply search keyword filter
                     if (_searchKeyword.isNotEmpty) {
                       docs = docs.where((doc) {
                         final t = doc.data() as Map<String, dynamic>;
@@ -210,15 +209,14 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   }
 
   Widget _buildSummaryLoading() {
-    return Column(
-      children: const [
-        Text("Transaksi", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        SizedBox(height: 6),
-        Text("Sisa uang kamu", style: TextStyle(color: Colors.grey, fontSize: 14)),
-        SizedBox(height: 4),
-        CircularProgressIndicator(),
-        SizedBox(height: 18),
-        // You can add skeleton loaders for summary cards as well
+     return Column(
+      children: [
+        const Text("Ringkasan", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        const Text("Total Pemasukan & Pengeluaran", style: TextStyle(color: Colors.grey, fontSize: 14)),
+        const SizedBox(height: 4),
+        const CircularProgressIndicator(),
+        const SizedBox(height: 18),
       ],
     );
   }
@@ -343,7 +341,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                     child: Text(keterangan,
                         style: const TextStyle(fontSize: 13, color: Colors.grey)),
                   ),
-                Text("${t["sumber"]} • ${DateFormat('dd MMM yyyy').format((t["tanggal"] as Timestamp).toDate())}",
+                Text("${t["sumber"]} • ${DateFormat('dd MMM yyyy', 'id_ID').format((t["tanggal"] as Timestamp).toDate())}",
                     style: const TextStyle(fontSize: 13, color: Colors.grey)),
               ],
             ),

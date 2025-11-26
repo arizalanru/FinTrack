@@ -6,177 +6,224 @@ import 'package:intl/intl.dart';
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
 
-  // Helper function to get icon for each wallet source
-  IconData _getWalletIcon(String source) {
-    switch (source.toLowerCase()) {
-      case 'bca':
+  // Helper function to get icon for each wallet type
+  IconData _getWalletIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'bank':
         return Icons.account_balance;
-      case 'dana':
+      case 'e-wallet':
         return Icons.account_balance_wallet;
-      case 'gopay':
-        return Icons.payment; // Using a generic payment icon
+      case 'tunai':
+        return Icons.money;
       default:
-        return Icons.credit_card; // Default icon
+        return Icons.credit_card;
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser!;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F2),
+      backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
+        backgroundColor: const Color(0xFFF3F4F6),
         elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text(
-          "Dompet Saya",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
+          "Kelola Dompet",
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
+        // First stream: get all wallets
         stream: FirebaseFirestore.instance
-            .collection("users")
-            .doc(FirebaseAuth.instance.currentUser!.uid)
-            .collection("transactions")
+            .collection('users').doc(user.uid)
+            .collection('wallets')
             .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+        builder: (context, walletSnapshot) {
+          if (walletSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-                child: Text("Belum ada transaksi untuk menampilkan dompet."));
+          if (!walletSnapshot.hasData || walletSnapshot.data!.docs.isEmpty) {
+            return _buildEmptyWallet(context);
           }
 
-          final docs = snapshot.data!.docs;
+          final wallets = walletSnapshot.data!.docs;
+          
+          // Second stream: get all transactions to calculate balances
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users').doc(user.uid)
+                .collection('transactions')
+                .snapshots(),
+            builder: (context, transactionSnapshot) {
 
-          // Calculate total balance and balance per source
-          double totalSaldo = 0;
-          Map<String, double> walletBalances = {};
+              Map<String, double> transactionAdjustments = {};
+              if (transactionSnapshot.hasData) {
+                 for (var doc in transactionSnapshot.data!.docs) {
+                    final t = doc.data() as Map<String, dynamic>;
+                    final walletName = t['sumber'] as String;
+                    final amount = (t['nominal'] as num).toDouble();
+                    final type = t['type'] as String;
 
-          for (var doc in docs) {
-            final t = doc.data() as Map<String, dynamic>;
-            final nominal = (t['nominal'] as num).toDouble();
-            final type = t['type'] as String;
-            final source = t['sumber'] as String;
+                    if (type == 'income') {
+                      transactionAdjustments[walletName] = (transactionAdjustments[walletName] ?? 0) + amount;
+                    } else {
+                      transactionAdjustments[walletName] = (transactionAdjustments[walletName] ?? 0) - amount;
+                    }
+                 }
+              }
 
-            if (type == 'income') {
-              totalSaldo += nominal;
-              walletBalances[source] = (walletBalances[source] ?? 0) + nominal;
-            } else if (type == 'expense') {
-              totalSaldo -= nominal;
-              walletBalances[source] = (walletBalances[source] ?? 0) - nominal;
-            }
-          }
+              double totalSaldo = 0;
+              List<Map<String, dynamic>> walletDetails = [];
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Total Balance Card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0A2A5E),
-                    borderRadius: BorderRadius.circular(16),
+              for (var wallet in wallets) {
+                final w = wallet.data() as Map<String, dynamic>;
+                final initialBalance = (w['balance'] as num).toDouble();
+                final walletName = w['name'] as String;
+                final currentBalance = initialBalance + (transactionAdjustments[walletName] ?? 0);
+                
+                totalSaldo += currentBalance;
+                walletDetails.add({
+                  'name': walletName,
+                  'type': w['type'] as String,
+                  'balance': currentBalance,
+                });
+              }
+
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: _buildTotalSaldoCard(totalSaldo),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Total Saldo Kamu",
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        NumberFormat.currency(locale: 'id', symbol: "Rp ")
-                            .format(totalSaldo)
-                            .replaceAll(",00", ""),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("Dompet", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
                   ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // List of Wallets
-                const Text(
-                  "Rincian Dompet",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-
-                if (walletBalances.isEmpty)
-                  const Center(child: Text("Tidak ada dompet ditemukan."))
-                else
-                  Column(
-                    children: walletBalances.entries.map((entry) {
-                      final source = entry.key;
-                      final balance = entry.value;
-                      return _walletTile(source, balance);
-                    }).toList(),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: walletDetails.length,
+                      itemBuilder: (context, index) {
+                        final detail = walletDetails[index];
+                        return _walletTile(
+                          detail['name'],
+                          detail['type'],
+                          detail['balance'],
+                        );
+                      },
+                    ),
                   ),
-              ],
-            ),
+                  _buildAddWalletButton(context),
+                ],
+              );
+            },
           );
         },
       ),
     );
   }
 
-  Widget _walletTile(String source, double balance) {
+  Widget _buildTotalSaldoCard(double totalSaldo) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF0A2A5E),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFFEFF3F8),
-            child: Icon(_getWalletIcon(source), color: const Color(0xFF0A2A5E)),
+          const Text(
+            "Total Saldo",
+            style: TextStyle(color: Colors.white70, fontSize: 16),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  source,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 2),
-                 Text(
-                  "Saldo",
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 8),
           Text(
             NumberFormat.currency(locale: 'id', symbol: "Rp ")
-                .format(balance)
+                .format(totalSaldo)
                 .replaceAll(",00", ""),
             style: const TextStyle(
-              fontSize: 16,
+              color: Colors.white,
+              fontSize: 32,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0A2A5E),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _walletTile(String name, String type, double balance) {
+    return Card(
+      elevation: 0.5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        leading: CircleAvatar(
+          radius: 25,
+          backgroundColor: const Color(0xFFE6EDFF),
+          child: Icon(_getWalletIcon(type), color: const Color(0xFF0A2A5E)),
+        ),
+        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(type),
+        trailing: Text(
+          NumberFormat.currency(locale: 'id', symbol: "Rp ")
+              .format(balance)
+              .replaceAll(",00", ""),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddWalletButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.pushNamed(context, '/add-wallet');
+          },
+          icon: const Icon(Icons.add),
+          label: const Text("Tambah Dompet"), // Removed the extra '+'
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0A2A5E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyWallet(BuildContext context) {
+     return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text("Anda belum memiliki dompet.", style: TextStyle(fontSize: 18, color: Colors.grey)),
+          const SizedBox(height: 20),
+          _buildAddWalletButton(context),
         ],
       ),
     );
