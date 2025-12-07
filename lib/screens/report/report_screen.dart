@@ -38,52 +38,67 @@ class _ReportScreenState extends State<ReportScreen> {
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
       builder: (_) {
-        return StatefulBuilder(builder: (context, setStateModal) {
-          return Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Choose Period",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                ...[
-                  "Today",
-                  "Last 7 Days",
-                  "Last 2 Weeks",
-                  "Last 1 Month",
-                  "Last 1 Year"
-                ].map((p) => RadioListTile(
-                  value: p,
-                  groupValue: selectedPeriod,
-                  activeColor: const Color(0xFF0A2A5E),
-                  onChanged: (val) {
-                    setStateModal(() => selectedPeriod = val.toString());
-                    setState(() {});
-                  },
-                  title: Text(p),
-                )),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
+        return StatefulBuilder(
+          builder: (context, setStateModal) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Choose Period",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  ...[
+                    "Today",
+                    "Last 7 Days",
+                    "Last 2 Weeks",
+                    "Last 1 Month",
+                    "Last 1 Year",
+                  ].map((p) {
+                    final selected = selectedPeriod == p;
+                    return ListTile(
+                      leading: Icon(
+                        selected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                        color: selected ? const Color(0xFF0A2A5E) : Colors.grey,
+                      ),
+                      title: Text(p),
+                      onTap: () {
+                        setStateModal(() => selectedPeriod = p);
+                        setState(() {});
+                      },
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0A2A5E),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12))),
-                    child: const Text("Apply",
-                        style: TextStyle(color: Colors.white, fontSize: 16)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "Apply",
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        });
+                ],
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -101,64 +116,70 @@ class _ReportScreenState extends State<ReportScreen> {
       backgroundColor: const Color(0xFFF2F2F2),
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
-            stream: query.snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+          stream: query.snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return _buildEmptyState();
+            }
+
+            final docs = snapshot.data!.docs;
+
+            Map<String, double> expenseCategoryTotals = {};
+            Map<String, double> incomeCategoryTotals = {};
+            List<DocumentSnapshot> expenseTransactions = [];
+            List<DocumentSnapshot> incomeTransactions = [];
+
+            for (var doc in docs) {
+              final t = doc.data() as Map<String, dynamic>;
+              final type = t['type'];
+              final category = t['kategori'] as String;
+              final nominal = (t['nominal'] as num).toDouble();
+
+              if (type == 'expense') {
+                expenseTransactions.add(doc);
+                expenseCategoryTotals[category] =
+                    (expenseCategoryTotals[category] ?? 0) + nominal;
+              } else if (type == 'income') {
+                incomeTransactions.add(doc);
+                incomeCategoryTotals[category] =
+                    (incomeCategoryTotals[category] ?? 0) + nominal;
               }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return _buildEmptyState();
-              }
+            }
 
-              final docs = snapshot.data!.docs;
+            final currentCategoryTotals = isExpense
+                ? expenseCategoryTotals
+                : incomeCategoryTotals;
+            final currentTransactions = isExpense
+                ? expenseTransactions
+                : incomeTransactions;
+            final chartData = currentCategoryTotals.entries
+                .map((e) => _ChartData(e.key, e.value))
+                .toList();
+            final total = currentCategoryTotals.values.fold(
+              0.0,
+              (acc, item) => acc + item,
+            );
 
-              Map<String, double> expenseCategoryTotals = {};
-              Map<String, double> incomeCategoryTotals = {};
-              List<DocumentSnapshot> expenseTransactions = [];
-              List<DocumentSnapshot> incomeTransactions = [];
-
-              for (var doc in docs) {
-                final t = doc.data() as Map<String, dynamic>;
-                final type = t['type'];
-                final category = t['kategori'] as String;
-                final nominal = (t['nominal'] as num).toDouble();
-
-                if (type == 'expense') {
-                  expenseTransactions.add(doc);
-                  expenseCategoryTotals[category] =
-                      (expenseCategoryTotals[category] ?? 0) + nominal;
-                } else if (type == 'income') {
-                  incomeTransactions.add(doc);
-                  incomeCategoryTotals[category] =
-                      (incomeCategoryTotals[category] ?? 0) + nominal;
-                }
-              }
-
-              final currentCategoryTotals =
-              isExpense ? expenseCategoryTotals : incomeCategoryTotals;
-              final currentTransactions =
-              isExpense ? expenseTransactions : incomeTransactions;
-              final chartData = currentCategoryTotals.entries
-                  .map((e) => _ChartData(e.key, e.value))
-                  .toList();
-              final total =
-              currentCategoryTotals.values.fold(0.0, (sum, item) => sum + item);
-
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 16),
-                      _buildTypeToggle(),
-                      const SizedBox(height: 20),
-                      _buildChartCard(total, chartData),
-                      const SizedBox(height: 16),
-                      _buildTransactionList(currentTransactions),
-                    ]),
-              );
-            }),
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 16),
+                  _buildTypeToggle(),
+                  const SizedBox(height: 20),
+                  _buildChartCard(total, chartData),
+                  const SizedBox(height: 16),
+                  _buildTransactionList(currentTransactions),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -169,24 +190,34 @@ class _ReportScreenState extends State<ReportScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text("Your Financial Report",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text(
+              "Your Financial Report",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
             IconButton(
-                onPressed: _openPeriodSheet,
-                icon: const Icon(Icons.calendar_month, size: 28))
+              onPressed: _openPeriodSheet,
+              icon: const Icon(Icons.calendar_month, size: 28),
+            ),
           ],
         ),
         const SizedBox(height: 6),
         Center(
-          child: Column(children: [
-            const Text("Period",
-                style: TextStyle(color: Colors.grey, fontSize: 14)),
-            Text(selectedPeriod,
+          child: Column(
+            children: [
+              const Text(
+                "Period",
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+              Text(
+                selectedPeriod,
                 style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0A2A5E))),
-          ]),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0A2A5E),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -221,44 +252,52 @@ class _ReportScreenState extends State<ReportScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
       ),
-      child: Row(children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => isExpense = true),
-            child: Container(
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color:
-                isExpense ? const Color(0xFF0A2A5E) : Colors.transparent,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Text("Expense",
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => isExpense = true),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isExpense
+                      ? const Color(0xFF0A2A5E)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  "Expense",
                   style: TextStyle(
                     color: isExpense ? Colors.white : Colors.black,
                     fontWeight: FontWeight.bold,
-                  )),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => isExpense = false),
-            child: Container(
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color:
-                !isExpense ? const Color(0xFF0A2A5E) : Colors.transparent,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Text("Income",
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => isExpense = false),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: !isExpense
+                      ? const Color(0xFF0A2A5E)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  "Income",
                   style: TextStyle(
                     color: !isExpense ? Colors.white : Colors.black,
                     fontWeight: FontWeight.bold,
-                  )),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -269,59 +308,64 @@ class _ReportScreenState extends State<ReportScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Column(children: [
-        Text(isExpense ? "Total Expenses" : "Total Income",
-            style: const TextStyle(fontSize: 16, color: Colors.grey)),
-        const SizedBox(height: 6),
-        Text(
-          NumberFormat.currency(locale: 'id', symbol: "Rp ")
-              .format(total)
-              .replaceAll(",00", ""),
-          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        if (chartData.isNotEmpty)
-          SizedBox(
-            height: 250,
-            child: SfCircularChart(
-              legend: Legend(
-                isVisible: true,
-                position: LegendPosition.bottom,
-                overflowMode: LegendItemOverflowMode.wrap,
-              ),
-              series: <DoughnutSeries>[
-                DoughnutSeries<_ChartData, String>(
-                  dataSource: chartData,
-                  xValueMapper: (data, _) => data.label,
-                  yValueMapper: (data, _) => data.value,
-                  innerRadius: '55%',
-                  radius: '75%',
-                  strokeWidth: 3,
-                  strokeColor: Colors.white,
-                  dataLabelSettings: const DataLabelSettings(
-                    isVisible: true,
-                    labelPosition: ChartDataLabelPosition.outside,
-                  ),
-                  pointColorMapper: (_, index) {
-                    List<Color> colors = [
-                      const Color(0xFF062A61),
-                      const Color(0xFF2C4F87),
-                      const Color(0xFF567DB3),
-                      const Color(0xFF8EB5D3),
-                      const Color(0xFFC5DDF0),
-                    ];
-                    return colors[index % colors.length];
-                  },
-                )
-              ],
-            ),
-          )
-        else
-          const SizedBox(
-            height: 250,
-            child: Center(child: Text("No data available")),
+      child: Column(
+        children: [
+          Text(
+            isExpense ? "Total Expenses" : "Total Income",
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
           ),
-      ]),
+          const SizedBox(height: 6),
+          Text(
+            NumberFormat.currency(
+              locale: 'id',
+              symbol: "Rp ",
+            ).format(total).replaceAll(",00", ""),
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          if (chartData.isNotEmpty)
+            SizedBox(
+              height: 250,
+              child: SfCircularChart(
+                legend: Legend(
+                  isVisible: true,
+                  position: LegendPosition.bottom,
+                  overflowMode: LegendItemOverflowMode.wrap,
+                ),
+                series: <DoughnutSeries>[
+                  DoughnutSeries<_ChartData, String>(
+                    dataSource: chartData,
+                    xValueMapper: (data, _) => data.label,
+                    yValueMapper: (data, _) => data.value,
+                    innerRadius: '55%',
+                    radius: '75%',
+                    strokeWidth: 3,
+                    strokeColor: Colors.white,
+                    dataLabelSettings: const DataLabelSettings(
+                      isVisible: true,
+                      labelPosition: ChartDataLabelPosition.outside,
+                    ),
+                    pointColorMapper: (_, index) {
+                      List<Color> colors = [
+                        const Color(0xFF062A61),
+                        const Color(0xFF2C4F87),
+                        const Color(0xFF567DB3),
+                        const Color(0xFF8EB5D3),
+                        const Color(0xFFC5DDF0),
+                      ];
+                      return colors[index % colors.length];
+                    },
+                  ),
+                ],
+              ),
+            )
+          else
+            const SizedBox(
+              height: 250,
+              child: Center(child: Text("No data available")),
+            ),
+        ],
+      ),
     );
   }
 
@@ -350,8 +394,10 @@ class _ReportScreenState extends State<ReportScreen> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Center(
-              child: Text("No transactions.",
-                  style: TextStyle(color: Colors.grey)),
+              child: Text(
+                "No transactions.",
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
           ),
       ],
@@ -363,28 +409,35 @@ class _ReportScreenState extends State<ReportScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(14)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Row(
         children: [
           CircleAvatar(
-              radius: 22,
-              backgroundColor: const Color(0xFFEFF3F8),
-              child: Icon(
-                  t["type"] == 'income'
-                      ? Icons.arrow_downward
-                      : Icons.arrow_upward,
-                  color: const Color(0xFF0A2A5E))),
+            radius: 22,
+            backgroundColor: const Color(0xFFEFF3F8),
+            child: Icon(
+              t["type"] == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
+              color: const Color(0xFF0A2A5E),
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t["kategori"],
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text(
-                    DateFormat('dd MMM yyyy', 'id_ID')
-                        .format((t["tanggal"] as Timestamp).toDate()),
-                    style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                  t["kategori"],
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  DateFormat(
+                    'dd MMM yyyy',
+                    'id_ID',
+                  ).format((t["tanggal"] as Timestamp).toDate()),
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                ),
               ],
             ),
           ),

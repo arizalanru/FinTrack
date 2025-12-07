@@ -23,7 +23,6 @@ class WalletScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             const Text(
               "Balance Total In Each Wallet",
               style: TextStyle(color: Colors.grey, fontSize: 14),
@@ -41,8 +40,10 @@ class WalletScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Balance Amount",
-                      style: TextStyle(color: Colors.white, fontSize: 14)),
+                  const Text(
+                    "Balance Amount",
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
                   const SizedBox(height: 6),
                 ],
               ),
@@ -50,8 +51,10 @@ class WalletScreen extends StatelessWidget {
 
             const SizedBox(height: 22),
 
-            const Text("Wallet",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              "Wallet",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
 
             const SizedBox(height: 20),
@@ -68,21 +71,24 @@ class WalletScreen extends StatelessWidget {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A2A5E),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14))),
+                  backgroundColor: const Color(0xFF0A2A5E),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
                 child: const Text(
                   "+ Add Wallet",
                   style: TextStyle(fontSize: 16, color: Colors.white),
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),
     );
   }
 
+  // ignore: unused_element
   Widget _walletTile(String name, String type, int amount) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -96,16 +102,23 @@ class WalletScreen extends StatelessWidget {
           CircleAvatar(
             radius: 22,
             backgroundColor: Colors.blue.shade100,
-            child: const Icon(Icons.account_balance_wallet, color: Color(0xFF0A2A5E)),
+            child: const Icon(
+              Icons.account_balance_wallet,
+              color: Color(0xFF0A2A5E),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 Text(type, style: const TextStyle(color: Colors.grey)),
               ],
             ),
@@ -113,7 +126,10 @@ class WalletScreen extends StatelessWidget {
           Text(
             "Rp $amount",
             style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
           ),
         ],
       ),

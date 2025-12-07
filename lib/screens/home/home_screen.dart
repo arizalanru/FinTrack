@@ -4,14 +4,14 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fintrack/providers/auth_provider.dart' as MyAuth;
+import 'package:fintrack/providers/auth_provider.dart' as my_auth;
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<MyAuth.AuthProvider>(context);
+    final auth = Provider.of<my_auth.AuthProvider>(context);
     final user = FirebaseAuth.instance.currentUser!;
     final userName = auth.userName.isEmpty ? "User" : auth.userName;
 
@@ -23,7 +23,6 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               /// ===== HEADER USER =====
               Row(
                 children: [
@@ -37,7 +36,7 @@ class HomeScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Halo, ${userName.split(' ').first}", 
+                        "Halo, ${userName.split(' ').first}",
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -57,13 +56,23 @@ class HomeScreen extends StatelessWidget {
 
               /// ===== SALDO & DOMPET (REFACTORED) =====
               StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').doc(user.uid).collection('wallets').snapshots(),
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .collection('wallets')
+                    .snapshots(),
                 builder: (context, walletSnapshot) {
                   return StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('users').doc(user.uid).collection('transactions').snapshots(),
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user.uid)
+                        .collection('transactions')
+                        .snapshots(),
                     builder: (context, transactionSnapshot) {
-                      
-                      if (walletSnapshot.connectionState == ConnectionState.waiting || transactionSnapshot.connectionState == ConnectionState.waiting) {
+                      if (walletSnapshot.connectionState ==
+                              ConnectionState.waiting ||
+                          transactionSnapshot.connectionState ==
+                              ConnectionState.waiting) {
                         return _loadingCard();
                       }
 
@@ -74,7 +83,8 @@ class HomeScreen extends StatelessWidget {
                         walletCount = walletSnapshot.data!.docs.length;
                         for (var doc in walletSnapshot.data!.docs) {
                           final data = doc.data() as Map<String, dynamic>;
-                          totalInitialBalance += (data['balance'] as num).toDouble();
+                          totalInitialBalance += (data['balance'] as num)
+                              .toDouble();
                         }
                       }
 
@@ -93,7 +103,8 @@ class HomeScreen extends StatelessWidget {
                       }
 
                       // Final, correct total saldo
-                      double totalSaldo = totalInitialBalance + income - expense;
+                      double totalSaldo =
+                          totalInitialBalance + income - expense;
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,28 +112,34 @@ class HomeScreen extends StatelessWidget {
                           _buildExpenseCard(expense),
                           const SizedBox(height: 20),
                           const Text(
-                              "Balance Amount & Your Wallets",
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            "Balance Amount & Your Wallets",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Row(
                             children: [
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => Navigator.pushNamed(context, '/wallet'),
+                                  onTap: () =>
+                                      Navigator.pushNamed(context, '/wallet'),
                                   child: _infoCard(
                                     icon: Icons.account_balance_wallet,
                                     title: "Balance Amount",
-                                    value: NumberFormat.currency(locale: 'id', symbol: "Rp ")
-                                        .format(totalSaldo)
-                                        .replaceAll(",00", ""),
+                                    value: NumberFormat.currency(
+                                      locale: 'id',
+                                      symbol: "Rp ",
+                                    ).format(totalSaldo).replaceAll(",00", ""),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => Navigator.pushNamed(context, '/wallet'),
+                                  onTap: () =>
+                                      Navigator.pushNamed(context, '/wallet'),
                                   child: _infoCard(
                                     icon: Icons.wallet,
                                     title: "Your Wallets",
@@ -177,9 +194,10 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            NumberFormat.currency(locale: 'id', symbol: "Rp ")
-                .format(expense)
-                .replaceAll(",00", ""),
+            NumberFormat.currency(
+              locale: 'id',
+              symbol: "Rp ",
+            ).format(expense).replaceAll(",00", ""),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 28,
@@ -190,7 +208,7 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildCategoryChart(String uid) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -239,8 +257,8 @@ class HomeScreen extends StatelessWidget {
                 yValueMapper: (d, _) => d.value,
                 innerRadius: '55%',
                 radius: '75%',
-                strokeWidth: 3,                      
-                strokeColor: Colors.white,           
+                strokeWidth: 3,
+                strokeColor: Colors.white,
                 dataLabelSettings: const DataLabelSettings(
                   isVisible: true,
                   labelPosition: ChartDataLabelPosition.outside,
@@ -279,7 +297,7 @@ class HomeScreen extends StatelessWidget {
 
         return Column(
           children: snapshot.data!.docs.map((doc) {
-            final t = doc.data() as Map<String, dynamic>;
+            final t = doc.data();
             return _transactionItem(t);
           }).toList(),
         );
@@ -300,7 +318,11 @@ class HomeScreen extends StatelessWidget {
     ),
   );
 
-  Widget _infoCard({required IconData icon, required String title, required String value}) {
+  Widget _infoCard({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -337,9 +359,18 @@ class HomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                  t["kategori"] ?? "Unknown",
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text(DateFormat('dd MMM yyyy', 'id_ID').format((t["tanggal"] as Timestamp).toDate())),
+                t["kategori"] ?? "Unknown",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                DateFormat(
+                  'dd MMM yyyy',
+                  'id_ID',
+                ).format((t["tanggal"] as Timestamp).toDate()),
+              ),
             ],
           ),
           Text(

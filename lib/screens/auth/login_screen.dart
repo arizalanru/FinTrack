@@ -27,7 +27,11 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             const Text(
               "Welcome To Fintrack!",
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0A2A5E)),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0A2A5E),
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -40,7 +44,9 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: emailController,
               decoration: const InputDecoration(
                 labelText: "Email",
-                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(16)),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -50,7 +56,9 @@ class _LoginScreenState extends State<LoginScreen> {
               obscureText: true,
               decoration: const InputDecoration(
                 labelText: "Password",
-                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(16)),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -62,26 +70,37 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: auth.isLoading
                     ? null
                     : () async {
-                  final result = await auth.login(
-                    emailController.text.trim(),
-                    passwordController.text.trim(),
-                  );
+                        // Capture navigator and messenger synchronously before async gap
+                        final navigator = Navigator.of(context);
+                        final messenger = ScaffoldMessenger.of(context);
 
-                  if (result == null) {
-                    Navigator.pushReplacementNamed(context, '/home');
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(result)),
-                    );
-                  }
-                },
+                        final result = await auth.login(
+                          emailController.text.trim(),
+                          passwordController.text.trim(),
+                        );
+
+                        if (!mounted) return;
+
+                        if (result == null) {
+                          navigator.pushReplacementNamed('/home');
+                        } else {
+                          messenger.showSnackBar(
+                            SnackBar(content: Text(result)),
+                          );
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0A2A5E),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
                 child: auth.isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Login", style: TextStyle(fontSize: 18, color: Colors.white)),
+                    : const Text(
+                        "Login",
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
               ),
             ),
 
@@ -89,9 +108,12 @@ class _LoginScreenState extends State<LoginScreen> {
             Center(
               child: TextButton(
                 onPressed: () => Navigator.pushNamed(context, "/register"),
-                child: const Text("Dont Have An Account? Register", style: TextStyle(color: Color(0xFF0A2A5E))),
+                child: const Text(
+                  "Dont Have An Account? Register",
+                  style: TextStyle(color: Color(0xFF0A2A5E)),
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),
