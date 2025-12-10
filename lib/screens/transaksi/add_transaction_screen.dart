@@ -119,7 +119,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(40),
-                  color: isExpense ? const Color(0xFF0A2A5E) : Colors.transparent,
+                  color: isExpense
+                      ? const Color(0xFF0A2A5E)
+                      : Colors.transparent,
                 ),
                 child: Text(
                   "Expense",
@@ -142,7 +144,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(40),
-                  color: !isExpense ? const Color(0xFF0A2A5E) : Colors.transparent,
+                  color: !isExpense
+                      ? const Color(0xFF0A2A5E)
+                      : Colors.transparent,
                 ),
                 child: Text(
                   "Income",
@@ -190,7 +194,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return DropdownButtonFormField<String>(
       decoration: _inputDecoration(),
       hint: const Text("Choose category"),
-      value: selectedCategory,
+      initialValue: selectedCategory,
       items: (isExpense ? expenseCategories : incomeCategories)
           .map((e) => DropdownMenuItem(value: e, child: Text(e)))
           .toList(),
@@ -216,8 +220,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           return _buildEmptyWalletDropdown();
         }
 
-        List<DropdownMenuItem<String>> walletItems =
-        snapshot.data!.docs.map((doc) {
+        List<DropdownMenuItem<String>> walletItems = snapshot.data!.docs.map((
+          doc,
+        ) {
           final walletName = doc['name'] as String;
           return DropdownMenuItem(value: walletName, child: Text(walletName));
         }).toList();
@@ -225,7 +230,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         return DropdownButtonFormField<String>(
           decoration: _inputDecoration(),
           hint: const Text("Choose wallet"),
-          value: selectedWallet,
+          initialValue: selectedWallet,
           items: walletItems,
           onChanged: (value) => setState(() => selectedWallet = value),
         );
@@ -239,9 +244,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         Navigator.pushNamed(context, '/add-wallet');
       },
       child: InputDecorator(
-        decoration: _inputDecoration().copyWith(
-          hintText: 'No wallets found',
-        ),
+        decoration: _inputDecoration().copyWith(hintText: 'No wallets found'),
         child: const Text(
           'Tap to add a new wallet',
           style: TextStyle(color: Colors.grey),
@@ -298,8 +301,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           }
 
           String? result = await provider.addTransaction(
-            nominal:
-            double.parse(_amountController.text.replaceAll('.', '')),
+            nominal: double.parse(_amountController.text.replaceAll('.', '')),
             kategori: selectedCategory!,
             sumber: selectedWallet!,
             tanggal: selectedDate,
@@ -323,7 +325,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         ),
         child: provider.isLoading
             ? const CircularProgressIndicator(color: Colors.white)
-            : const Text("Add", style: TextStyle(fontSize: 18, color: Colors.white)),
+            : const Text(
+                "Add",
+                style: TextStyle(fontSize: 18, color: Colors.white),
+              ),
       ),
     );
   }

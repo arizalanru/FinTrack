@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fintrack/providers/auth_provider.dart' as MyAuth;
+import 'package:fintrack/providers/auth_provider.dart' as my_auth;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -26,13 +25,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _loadUserData() {
-    final authProvider = Provider.of<MyAuth.AuthProvider>(context, listen: false);
+    final authProvider = Provider.of<my_auth.AuthProvider>(
+      context,
+      listen: false,
+    );
     setState(() {
       _nameController.text = authProvider.userName;
       _emailController.text = authProvider.userEmail;
       _phoneController.text = authProvider.userPhone;
       if (authProvider.userName.isNotEmpty) {
-        _initials = authProvider.userName.split(' ').map((e) => e[0]).take(2).join();
+        _initials = authProvider.userName
+            .split(' ')
+            .map((e) => e[0])
+            .take(2)
+            .join();
       }
     });
   }
@@ -40,33 +46,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // Reverted to the simpler save logic
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate() || _isLoading) return;
-    
+
     setState(() => _isLoading = true);
 
-    final authProvider = Provider.of<MyAuth.AuthProvider>(context, listen: false);
+    final authProvider = Provider.of<my_auth.AuthProvider>(
+      context,
+      listen: false,
+    );
 
     try {
-      await FirebaseFirestore.instance.collection('users').doc(authProvider.user!.uid).update({
-        'name': _nameController.text,
-        'phone': _phoneController.text,
-      });
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(authProvider.user!.uid)
+          .update({
+            'name': _nameController.text,
+            'phone': _phoneController.text,
+          });
 
       await authProvider.loadUserData();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('New Profile Successfully Changed'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('New Profile Successfully Changed'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed To Update Profile: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed To Update Profile: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
-       if (mounted) {
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }
@@ -80,7 +98,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.black),
-        title: const Text("Edit Profile", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text(
+          "Edit Profile",
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -99,7 +120,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 CircleAvatar(
                   radius: 42,
                   backgroundColor: const Color(0xFF0A2A5E),
-                  child: Text(_initials, style: const TextStyle(fontSize: 28, color: Colors.white)),
+                  child: Text(
+                    _initials,
+                    style: const TextStyle(fontSize: 28, color: Colors.white),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 _buildTextField(_nameController, "Full Name"),
@@ -116,13 +140,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     onPressed: _isLoading ? null : _saveChanges,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0A2A5E),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     child: _isLoading
-                        ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                        : const Text("Apply Changes", style: TextStyle(fontSize: 16, color: Colors.white)),
+                        ? const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            "Apply Changes",
+                            style: TextStyle(fontSize: 16, color: Colors.white),
+                          ),
                   ),
-                )
+                ),
               ],
             ),
           ),
@@ -131,7 +164,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool readOnly = false}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label, {
+    bool readOnly = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -141,15 +178,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           controller: controller,
           readOnly: readOnly,
           validator: (value) {
-             if (value == null || value.isEmpty) {
-                return '$label Cannot Be Empty';
-              }
-              return null;
+            if (value == null || value.isEmpty) {
+              return '$label Cannot Be Empty';
+            }
+            return null;
           },
           decoration: InputDecoration(
             filled: true,
             // Change color if read-only to give a visual cue
-            fillColor: readOnly ? Colors.grey.shade200 : const Color(0xFFF2F2F2),
+            fillColor: readOnly
+                ? Colors.grey.shade200
+                : const Color(0xFFF2F2F2),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,

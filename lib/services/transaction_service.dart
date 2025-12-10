@@ -2,8 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class TransactionService {
-  final _db = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
+  // Removed unused private fields to silence analyzer warnings.
 
   Future<void> addTransaction({
     required double nominal,
@@ -11,7 +10,7 @@ class TransactionService {
     required String sumber,
     required DateTime tanggal,
     required String keterangan,
-    required String type
+    required String type,
   }) async {
     String uid = FirebaseAuth.instance.currentUser!.uid;
 
@@ -20,13 +19,13 @@ class TransactionService {
         .doc(uid)
         .collection("transactions")
         .add({
-      "nominal": nominal,
-      "kategori": kategori,
-      "sumber": sumber,
-      "tanggal": tanggal,
-      "createdAt": DateTime.now(),
-      "keterangan": keterangan,
-      "type": type,
-    });
+          "nominal": nominal,
+          "kategori": kategori,
+          "sumber": sumber,
+          "tanggal": tanggal,
+          "createdAt": DateTime.now(),
+          "keterangan": keterangan,
+          "type": type,
+        });
   }
 }

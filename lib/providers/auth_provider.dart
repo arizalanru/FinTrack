@@ -72,7 +72,7 @@ class AuthProvider with ChangeNotifier {
         }
       }
     } catch (e) {
-      print("Error loading/syncing user data: $e");
+      debugPrint("Error loading/syncing user data: $e");
     }
     notifyListeners();
   }
@@ -91,11 +91,19 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<String?> register(String name, String phone, String email, String password) async {
+  Future<String?> register(
+    String name,
+    String phone,
+    String email,
+    String password,
+  ) async {
     try {
       isLoading = true;
       notifyListeners();
-      final credential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
       await _db.collection("users").doc(credential.user!.uid).set({
         "uid": credential.user!.uid,
         "name": name,
@@ -112,7 +120,10 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<String?> changePassword({ required String oldPassword, required String newPassword }) async {
+  Future<String?> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
     isLoading = true;
     notifyListeners();
     final user = _auth.currentUser;
@@ -121,7 +132,10 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return "Tidak ada pengguna yang sedang login.";
     }
-    AuthCredential credential = EmailAuthProvider.credential(email: user.email!, password: oldPassword);
+    AuthCredential credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: oldPassword,
+    );
     try {
       await user.reauthenticateWithCredential(credential);
       await user.updatePassword(newPassword);
@@ -137,7 +151,10 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Corrected and safer email update logic
-  Future<String?> updateEmail({ required String newEmail, required String password }) async {
+  Future<String?> updateEmail({
+    required String newEmail,
+    required String password,
+  }) async {
     isLoading = true;
     notifyListeners();
     final user = _auth.currentUser;
@@ -146,15 +163,24 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return "Tidak ada pengguna yang sedang login.";
     }
-    AuthCredential credential = EmailAuthProvider.credential(email: user.email!, password: password);
+    AuthCredential credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: password,
+    );
     try {
       await user.reauthenticateWithCredential(credential);
       await user.verifyBeforeUpdateEmail(newEmail);
       return null; // Success - Let user know to check their email
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'wrong-password') return 'Password Anda salah.';
-      if (e.code == 'email-already-in-use') return 'Email ini sudah digunakan oleh akun lain.';
-      if (e.code == 'invalid-email') return 'Format email tidak valid.';
+      if (e.code == 'wrong-password') {
+        return 'Password Anda salah.';
+      }
+      if (e.code == 'email-already-in-use') {
+        return 'Email ini sudah digunakan oleh akun lain.';
+      }
+      if (e.code == 'invalid-email') {
+        return 'Format email tidak valid.';
+      }
       return 'Terjadi kesalahan: ${e.message}';
     } finally {
       isLoading = false;

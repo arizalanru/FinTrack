@@ -14,7 +14,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -109,30 +110,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: auth.isLoading
                       ? null
                       : () async {
-                    if (passwordController.text != confirmPasswordController.text) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Password Invalid")),
-                      );
-                      return;
-                    }
+                          if (passwordController.text !=
+                              confirmPasswordController.text) {
+                            final messenger = ScaffoldMessenger.of(context);
+                            messenger.showSnackBar(
+                              const SnackBar(content: Text("Password Invalid")),
+                            );
+                            return;
+                          }
 
-                    final result = await auth.register(
-                      nameController.text.trim(),
-                      phoneController.text.trim(),
-                      emailController.text.trim(),
-                      passwordController.text.trim(),
-                    );
+                          // Capture navigator and messenger synchronously before async gap
+                          final navigator = Navigator.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
 
-                    if (result == null) {
-                      if (mounted) {
-                        Navigator.pushReplacementNamed(context, "/login");
-                      }
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(result)),
-                      );
-                    }
-                  },
+                          final result = await auth.register(
+                            nameController.text.trim(),
+                            phoneController.text.trim(),
+                            emailController.text.trim(),
+                            passwordController.text.trim(),
+                          );
+
+                          if (!mounted) return;
+
+                          if (result == null) {
+                            navigator.pushReplacementNamed("/login");
+                          } else {
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(result)),
+                            );
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0A2A5E),
                     shape: RoundedRectangleBorder(
@@ -141,11 +148,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   child: auth.isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Sign Up", style: TextStyle(fontSize: 18, color: Colors.white)),
+                      : const Text(
+                          "Sign Up",
+                          style: TextStyle(fontSize: 18, color: Colors.white),
+                        ),
                 ),
               ),
-
-
 
               const SizedBox(height: 12),
               Center(
