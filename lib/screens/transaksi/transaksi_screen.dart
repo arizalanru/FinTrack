@@ -40,12 +40,132 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         return now.subtract(const Duration(days: 7));
       case "Last Month":
         return now.subtract(const Duration(days: 30));
-      case "Last Year": // Added this option
+      case "Last Year":
         return now.subtract(const Duration(days: 365));
-      default: // "Semua tanggal"
+      default:
         return null;
     }
   }
+
+  // ----------------------------------------------------------------------
+  // 🔥 EDIT & DELETE MENU
+  // ----------------------------------------------------------------------
+
+  void _openTransactionMenu(Map<String, dynamic> t) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit, color: Colors.blue),
+                title: const Text("Edit Transaction"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editTransaction(t);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text("Delete Transaction"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteTransaction(t);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteTransaction(Map<String, dynamic> t) async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    await FirebaseFirestore.instance
+        .collection("users")
+        .doc(uid)
+        .collection("transactions")
+        .doc(t['id'])
+        .delete();
+  }
+
+  void _editTransaction(Map<String, dynamic> t) {
+    final kategoriC = TextEditingController(text: t['kategori']);
+    final nominalC = TextEditingController(text: t['nominal'].toString());
+    final keteranganC = TextEditingController(text: t['keterangan'] ?? "");
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Edit Transaction",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+
+              TextField(
+                controller: kategoriC,
+                decoration: const InputDecoration(labelText: "Category"),
+              ),
+              TextField(
+                controller: nominalC,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Amount"),
+              ),
+              TextField(
+                controller: keteranganC,
+                decoration: const InputDecoration(labelText: "Note"),
+              ),
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await FirebaseFirestore.instance
+                        .collection("users")
+                        .doc(FirebaseAuth.instance.currentUser!.uid)
+                        .collection("transactions")
+                        .doc(t['id'])
+                        .update({
+                      'kategori': kategoriC.text,
+                      'nominal': int.tryParse(nominalC.text) ?? t['nominal'],
+                      'keterangan': keteranganC.text,
+                    });
+
+                    Navigator.pop(context);
+                  },
+                  child: const Text("Save Changes"),
+                ),
+              )
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ----------------------------------------------------------------------
 
   void _openFilterSheet() {
     showModalBottomSheet(
@@ -162,11 +282,11 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                 child: StreamBuilder<QuerySnapshot>(
                   stream: query.snapshots(),
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                    if (!snapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    if (snapshot.data!.docs.isEmpty) {
                       return const Center(
                         child: Text("No Transaction Yet",
                             style: TextStyle(fontSize: 16, color: Colors.grey)),
@@ -183,18 +303,13 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                       }).toList();
                     }
 
-                    if (docs.isEmpty) {
-                      return const Center(
-                        child: Text("No Matching Transactions",
-                            style: TextStyle(fontSize: 16, color: Colors.grey)),
-                      );
-                    }
-
                     return ListView.builder(
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
                         final doc = docs[index];
                         final t = doc.data() as Map<String, dynamic>;
+                        t['id'] = doc.id; // 🔥 Required for edit/delete
+
                         return _transactionTile(t);
                       },
                     );
@@ -208,15 +323,18 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     );
   }
 
+  // ----------------------------------------------------------------------
+
   Widget _buildSummaryLoading() {
-     return Column(
-      children: [
-        const Text("Summary", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        const Text("Expense & Income Amount", style: TextStyle(color: Colors.grey, fontSize: 14)),
-        const SizedBox(height: 4),
-        const CircularProgressIndicator(),
-        const SizedBox(height: 18),
+    return Column(
+      children: const [
+        Text("Summary", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        SizedBox(height: 6),
+        Text("Expense & Income Amount",
+            style: TextStyle(color: Colors.grey, fontSize: 14)),
+        SizedBox(height: 4),
+        CircularProgressIndicator(),
+        SizedBox(height: 18),
       ],
     );
   }
@@ -226,16 +344,15 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
       children: [
         const Text("Transaction", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
-        const Text("Remaining Balance", style: TextStyle(color: Colors.grey, fontSize: 14)),
+        const Text("Remaining Balance",
+            style: TextStyle(color: Colors.grey, fontSize: 14)),
         const SizedBox(height: 4),
         Text(
           NumberFormat.currency(locale: 'id', symbol: "Rp ")
               .format(saldo)
               .replaceAll(",00", ""),
           style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0A2A5E)),
+              fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         const SizedBox(height: 18),
         Row(
@@ -293,19 +410,25 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            Text(title,
+                style: TextStyle(color: color, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             Text(
               NumberFormat.currency(locale: 'id', symbol: "Rp ")
                   .format(amount)
                   .replaceAll(",00", ""),
-              style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: color, fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ],
         ),
       ),
     );
   }
+
+  // ----------------------------------------------------------------------
+  // 🔥 TRANSACTION TILE WITH EDIT/DELETE
+  // ----------------------------------------------------------------------
 
   Widget _transactionTile(Map<String, dynamic> t) {
     final keterangan = t['keterangan'] as String?;
@@ -341,23 +464,40 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                     child: Text(keterangan,
                         style: const TextStyle(fontSize: 13, color: Colors.grey)),
                   ),
-                Text("${t["sumber"]} • ${DateFormat('dd MMM yyyy', 'id_ID').format((t["tanggal"] as Timestamp).toDate())}",
-                    style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                Text(
+                  "${t["sumber"]} • ${DateFormat('dd MMM yyyy', 'id_ID').format((t["tanggal"] as Timestamp).toDate())}",
+                  style:
+                  const TextStyle(fontSize: 13, color: Colors.grey),
+                ),
               ],
             ),
           ),
-          Text(
-            NumberFormat.currency(
-              locale: 'id',
-              symbol: t["type"] == "income" ? "Rp " : "-Rp ",
-            ).format(t["nominal"]).replaceAll(",00", ""),
-            style: TextStyle(
-              color: t["type"] == "income" ? Colors.green : Colors.red,
-              fontWeight: FontWeight.bold,
-            ),
+
+          // Right side: amount + menu
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                NumberFormat.currency(
+                  locale: 'id',
+                  symbol: t["type"] == "income" ? "Rp " : "-Rp ",
+                ).format(t["nominal"]).replaceAll(",00", ""),
+                style: TextStyle(
+                  color:
+                  t["type"] == "income" ? Colors.green : Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: () => _openTransactionMenu(t),
+                child: const Icon(Icons.more_vert),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+
